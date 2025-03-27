@@ -24,10 +24,10 @@ data = iddata(y, u);
 G_frf = spa(data); 
 
 % display the Bode plot of the identified system
-% figure("Name", "Bode Plot of Identified FRF");
-% bode(G_frf);
-% grid on;
-% title('Bode Plot of the Identified System');
+figure("Name", "Bode Plot of Identified FRF");
+bode(G_frf);
+grid on;
+title('Bode Plot of the Identified System');
 
 [Sy, f] = cpsd(y, y, [], [], N);    % Output PSD
 [Syu, ~] = cpsd(y, u, [], [], N);   % Cross PSD
