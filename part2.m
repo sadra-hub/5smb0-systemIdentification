@@ -1,50 +1,31 @@
-clc 
-close all
-clear
+clc; close all; clear;
 
-% Generate multi-sine input signal
+% defining datapoints, butterfilter range and bandwidth
 N = 1500;
-t = (0:N-1)'; % Time vector
-% the passband here is below the cut off frequency we calculated at part 1
-frequencies = linspace(0.01, 0.719, 100); % 100 frequencies in passband
-r = sum(sin(2 * pi * frequencies .* t), 2); % Multi-sine signal
+M = 1.8;
+x = 0.69969;
 
-% Obtain system response
-[u, y] = assignment_sys_33(r, "open loop");
+Band = [0 x];
+Range = [-M,M];
 
-% Estimate FRF using nonparametric identification
-[H, f] = tfestimate(u, y, [], [], [], 1);
+% (at least) 100 frequencies within the bandwidth
+SineData = [100,100,1];
 
-% % Bode plot
-% figure;
-% subplot(2,1,1);
-% semilogx(f, 20*log10(abs(H))); % Magnitude response
-% xlabel('Frequency (Hz)');
-% ylabel('Magnitude (dB)');
-% title('Bode Plot - Magnitude Response');
-% grid on;
-% 
-% subplot(2,1,2);
-% semilogx(f, angle(H)*180/pi); % Phase response
-% xlabel('Frequency (Hz)');
-% ylabel('Phase (degrees)');
-% title('Bode Plot - Phase Response');
-% grid on;
+% define input signal as multi sine
+r = idinput(N,'sine',Band, Range, SineData);
 
-[Pyy, f] = cpsd(y, y, [], [], N);
-[Pyu, ~] = cpsd(y, u, [], [], N);
-[Puu, ~] = cpsd(u, u, [], [], N);
+% excite the system using the input signal
+[u , y] = assignment_sys_33(r,"open loop");
 
-% Compute the noise spectrum:
-Pvv = Pyy - abs(Pyu).^2 ./ Puu;
+% create a data object using the input and output of the system
+data = iddata(y, u);
 
-% TODO : Why it mentions the welch avergaing mehtod? am I missing somethign
-% here? 
-% visualize the noise spectrum
-figure;
-loglog(f, abs(Pvv));
-xlabel('Frequency (Hz)');
-ylabel('Magnitude of \Phi_v(\omega)');
-title('Estimated Noise Spectrum');
+% estimate the Frequency Response Function (FRF)
+G_frf = spa(data); 
+
+% display the Bode plot of the identified system
+figure("Name", "Bode Plot of Identified FRF");
+bode(G_frf);
 grid on;
+title('Bode Plot of the Identified System');
 
