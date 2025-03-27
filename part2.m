@@ -24,10 +24,23 @@ data = iddata(y, u);
 G_frf = spa(data); 
 
 % display the Bode plot of the identified system
-figure("Name", "Bode Plot of Identified FRF");
-bode(G_frf);
+% figure("Name", "Bode Plot of Identified FRF");
+% bode(G_frf);
+% grid on;
+% title('Bode Plot of the Identified System');
+
+[Sy, f] = cpsd(y, y, [], [], N);    % Output PSD
+[Syu, ~] = cpsd(y, u, [], [], N);   % Cross PSD
+[Su, ~] = cpsd(u, u, [], [], N);    % Input PSD
+
+% Compute noise spectrum estimate
+Phi_v = Sy - abs(Syu).^2 ./ Su;
+
+% Plot the magnitude in a Bode diagram
+figure;
+semilogx(f, 10*log10(abs(Phi_v)));
+xlabel('Frequency (Hz)');
+ylabel('Magnitude (dB)');
+title('Estimated Noise Spectrum \Phi_v');
+legend('Noise Spectrum');
 grid on;
-title('Bode Plot of the Identified System');
-
-
-
