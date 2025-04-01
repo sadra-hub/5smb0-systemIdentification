@@ -2,38 +2,42 @@
 % They all should be in a zip file called group_33_ssml.zip
 
 
-% -------- FINAL REPORT - GROUP 33: SADRA MOOSAVI LAR (2139901) --------- %
+%% -------- FINAL REPORT - GROUP 33: SADRA MOOSAVI LAR (2139901) -------- %
 
 % Repository: https://github.com/sadra-hub/5smb0-systemIdentification
 
-% ------------------------------ PART 1 --------------------------------- % 
+%% ------------------------------ PART 1 -------------------------------- % 
 
 clc; close all; clear;
 
 % Define an input signal to excite the system
-r = -300:0.01:300;
+r = linspace(-100,100,1000);
 [u, ~] = assignment_sys_33(r,'open loop');
-M = max(u);
 
 % Butterworth filter:
 numerator = [0.505 1.01 0.505];
 denominator = [1 0.7478 0.2722];
 F_q = filt(numerator, denominator);
 
+% M is the maximum or minmum response 
+M = max(u);
+
 % The bandwidth is the first frequency where 
-% the gain drops below 70.79% (-3 dB) of its DC value. (From MATLAB Docs) 
+% the gain drops below 70.79% (-3 dB) of its DC value. 
+% _From MATLAB Docs
 x = bandwidth(F_q)/pi;
 
-figure("Name","PART 1: Bode Plot")
-freqz(numerator, denominator)
+figure("Name", "Bode Plot of F(q)");
+title('$F(q)$', 'Interpreter', 'latex');
+freqz(numerator, denominator);
 
 % Display
 disp("M is : " + M)
 disp("x is :" + x)
 
-% ------------------------------ PART 2 --------------------------------- %
+%% ------------------------------ PART 2 -------------------------------- %
 
-clc; close all; clear;
+% clc; close all; clear;
 
 % defining datapoints, butterfilter range and bandwidth
 N = 1500;
@@ -81,9 +85,9 @@ legend('Noise Spectrum');
 grid on;
 
 
-% ------------------------------ PART 3 --------------------------------- %
+%% ------------------------------ PART 3 -------------------------------- %
 
-clc; close all; clear;
+% clc; close all; clear;
 
 % Generate input signal r(t) (Multi-sine signal)
 N = 3000;
@@ -105,11 +109,13 @@ r = idinput(N, 'prbs', Band, Range);
 data = iddata(y, u);
 
 % Save the iddata object to a .mat file
-save('data_open_loop.mat', 'data');
+% data is saved to a NEW file, to not overwrite the old data which is used 
+% for figures and report
+save('data/data_open_loop_NEW.mat', 'data');
 
-% ------------------------------ PART 4 --------------------------------- %
+%% ------------------------------ PART 4 -------------------------------- %
 
-clc; close all; clear;
+% clc; close all; clear;
 
 % Generate input signal r(t) (PRBS)
 N = 3000;
@@ -119,194 +125,219 @@ x = 0.69969;
 Band = [0 x];
 Range = [-M, M];
 
-% Define input signal as PRBS
-r_prbs = idinput(N, 'prbs', Band, Range);
-[u_prbs, y_prbs] = assignment_sys_33(r_prbs, "open loop");
-data_prbs = iddata(y_prbs, u_prbs);
+% Define input signal as PRBS (loading the produced data in part 2)
+data_open_loop = load('data/data_open_loop.mat');
+data_prbs = data_open_loop.data;
 
-% Define BJ Model
-model_BJ = bj(data_prbs, [4 3 4 3 1]);
+% % Define search ranges for BJ model orders
+% nb_range = 1:4;
+% nc_range = 1:5;
+% nd_range = 1:5;
+% nf_range = 1:4;
+% nk_range = 0:2;
+% 
+% % Preallocate storage
+% total_combinations = length(nb_range) * length(nc_range) * length(nd_range) * length(nf_range) * length(nk_range);
+% aic_values = NaN(total_combinations, 1);
+% model_orders = NaN(total_combinations, 5);  % [nb nc nd nf nk]
+% 
+% % Counter
+% counter = 1;
+% 
+% % Grid search over all combinations
+% for nb = nb_range
+%     for nc = nc_range
+%         for nd = nd_range
+%             for nf = nf_range
+%                 for nk = nk_range
+%                     try
+%                         model_BJ = bj(data_prbs, [nb nc nd nf nk]);
+%                         aic_val = aic(model_BJ);
+% 
+%                         % Store values
+%                         aic_values(counter) = aic_val;
+%                         model_orders(counter, :) = [nb nc nd nf nk];
+%                     catch
+%                         % If model fails, skip and continue
+%                         aic_values(counter) = inf;
+%                     end
+%                     counter = counter + 1;
+%                 end
+%             end
+%         end
+%     end
+% end
 
-% Define ARMAX
-model_ARMAX = armax(data_prbs, [4 3 3 1]);
+% best orders according to the code above which I commented out 
+% to save time
+best_orders = [4,5,5,4,1];
 
-% Define ARX
-model_ARX = arx(data_prbs, [4 3 1]);
+% Display result
+disp('Best BJ Model Orders [nb nc nd nf nk]:');
+disp(best_orders);
 
-% Define OE 
-% Changed the orders to 5 4 1 for open loop
-% Changed the orders to 5 5 0 for closed loop
-model_OE = oe(data_prbs, [5 5 0]);
+% fit final best model
+model_BJ = bj(data_prbs, best_orders);
 
-% Define ranges for na, nb, nk
-na_range = 1:5;  % Example range for na (AR order)
-nb_range = 1:5;  % Example range for nb (MA order)
-nk_range = 0:2;  % Example range for nk (delay)
+% load open loop validation data for validitation tests
+% validation data are PRBS signal similar to input
+data_open_loop_validation = load('data/data_open_loop_validation.mat');
+val_data_open = data_open_loop_validation.val_data;
 
-% Initialize variables to store AIC values and model orders
-aic_values = NaN(length(na_range)*length(nb_range)*length(nk_range), 1);
-model_orders = NaN(length(na_range)*length(nb_range)*length(nk_range), 3);  % Store orders [na, nb, nk]
+% Validation Test 1 : Pole 
+figure;
+pzmap(model_BJ);
+title('Pole-Zero Map of BJ Model');
+grid on;
 
-% Counter for storing the index of the best model
-counter = 1;
+is_stable = isstable(model_BJ);
+disp(['Is the BJ model stable? ', mat2str(is_stable)]);
 
-% Loop over all combinations of na, nb, nk
-for na = na_range
-    for nb = nb_range
-        for nk = nk_range
-            % Estimate the OE model with current orders
-            model_OE = oe(data_prbs, [na nb nk]);  % Estimate OE model
+% Validation Test 2: Residual Analysis 
+figure;
+resid(val_data_open, model_BJ);
+sgtitle('Residual Analysis of BJ Model');
 
-            % Calculate AIC using MATLAB's built-in aic function
-            aic_value = aic(model_OE);  % Compute AIC for the model
+% Compare with results in Part 2
+figure;
+bode(G_frf, model_BJ);
+grid on;
+legend('Nonparametric FRF (spa)', 'Parametric BJ Model');
+title('Comparison of Nonparametric FRF and BJ Model');
 
-            % Store AIC value and corresponding model orders
-            aic_values(counter) = aic_value;
-            model_orders(counter, :) = [na nb nk];
-
-            % Increment counter
-            counter = counter + 1;
-        end
-    end
-end
-
-% Find the model with the minimum AIC
-[~, best_idx] = min(aic_values);
-best_orders = model_orders(best_idx, :);
-
-% Display the best model orders and AIC value
-disp(['Best Model Orders (na, nb, nk): ', num2str(best_orders)]);
-disp(['Best AIC: ', num2str(aic_values(best_idx))]);
-
-% Generate validation input signal
-r_val = idinput(N, 'rgs', Band, Range);
-[u_val, y_val] = assignment_sys_33(r_val, "open loop");
-val_data = iddata(y_val, u_val);
-
-% Validation Test 1 : Compare models with validation data
-compare(val_data, model_OE);
+% Extract parameter variances (diagonal elements)
+cov_matrix = getcov(model_BJ);
+param_variances = diag(cov_matrix);
+disp('Parameter variances (theoretical):');
+disp(param_variances);
 
 
-% Validation Test 2: Residual Test
-% resid(val_data, model_OE);
+%% ------------------------------ PART 5 -------------------------------- %
 
-
-% Minimum Variance Estimate
-
-getcov(model_OE);
-
-
-% ------------------------------ PART 5 --------------------------------- %
-
-clc; close all; clear;
+% clc; close all; clear;
 
 % Initialize variables for Monte Carlo Simulation
 N = 3000;               % Number of data points
-M = 1.8;                % Maximum value of input signal
-x = 0.69969;            % Bandwidth range
+M = 1.8;                % Saturation limit
+x = 0.69969;            % Butterworth bandwidth (normalized)
 
-Band = [0 x];          % Frequency range
-Range = [-M, M];       % Range of values for input signal
-num_simulations = 1;   % Number of Monte Carlo simulations
+Band = [0 x];           
+Range = [-M, M];        
+num_simulations = 100;   % Number of Monte Carlo runs
 
-% Define the model orders for the OE model
-nb = 5;  % Order of the numerator polynomial
-nf = 4;  % Order of the denominator polynomial
+% Define best BJ model orders (from previous AIC search)
+nb = 4;  % B(q) numerator order
+nc = 5;  % C(q) noise numerator order
+nd = 5;  % D(q) noise denominator order
+nf = 4;  % F(q) system denominator order
 nk = 1;  % Input-output delay
 
-% Initialize arrays to store parameter estimates from each run
-B_estimates = zeros(num_simulations, nb);
-F_estimates = zeros(num_simulations, nf);
+% Get total number of parameters
+num_BJ_params = nb + nc + nd + nf;
 
-% Perform Monte Carlo simulations
+% Initialize array to store parameter estimates
+BJ_parameters = zeros(num_simulations, num_BJ_params);
+
+% Monte Carlo simulation
 for i = 1:num_simulations
-
-    % Define input signal as PRBS
     r_prbs = idinput(N, 'prbs', Band, Range);
-    [u_prbs, y_prbs] = assignment_sys_33(r_prbs, "open loop");
-    data_prbs = iddata(y_prbs, u_prbs);
+    [u, y] = assignment_sys_33(r_prbs, 'open loop');
+    data = iddata(y, u);
     
-    % Estimate the OE model for the data
-    model_OE = oe(data_prbs, [nb, nf, nk]);
-    
-    % Store the estimated parameters
-    B_estimates(i, :) = model_OE.B(2:end);  % Numerator coefficients
-    F_estimates(i, :) = model_OE.F(2:end);  % Denominator coefficients
+    try
+        model_BJ = bj(data, [nb nc nd nf nk]);
+        BJ_parameters(i, :) = model_BJ.ParameterVector';  % Store all parameters
+    catch
+        warning(['Model estimation failed at iteration ', num2str(i)]);
+        BJ_parameters(i, :) = NaN;  % Handle occasional fitting failures
+    end
 end
 
-% Calculate the mean and variance of the estimated parameters
-B_mean = mean(B_estimates, 1);
-B_variance = var(B_estimates, 0, 1);
-F_mean = mean(F_estimates, 1);
-F_variance = var(F_estimates, 0, 1);
+% Remove failed runs (rows with NaNs)
+BJ_parameters = BJ_parameters(~any(isnan(BJ_parameters), 2), :);
 
-% Covariance of matrix
-cov_matrix = getcov(model_OE);
+% Compute mean and variance of estimated parameters
+BJ_mean = mean(BJ_parameters, 1);
+BJ_variance = var(BJ_parameters, 0, 1);
 
-% Display results
-disp('Mean of B coefficients:');
-disp(B_mean);
-disp('Variance of B coefficients:');
-disp(B_variance);
+% Theoretical covariance matrix (from one final fit)
+model_BJ = bj(data, [nb nc nd nf nk]);
+cov_matrix = getcov(model_BJ);
+parameter_variances = diag(cov_matrix)';
 
-disp('Mean of F coefficients:');
-disp(F_mean);
-disp('Variance of F coefficients:');
-disp(F_variance);
+% Extract indices for B and F parameters (per question 5.3)
+% B starts at index 1, F starts after B + C + D
+B_indices = 1:nb;
+F_indices = (nb + nc + nd + 1):(nb + nc + nd + nf);
 
-disp('Covarince of Model OE:')
-disp(cov_matrix)
+% Extract Monte Carlo and theoretical variances for B and F
+B_variance_mc = BJ_variance(B_indices);
+F_variance_mc = BJ_variance(F_indices);
 
-% The diagonal of the covariance matrix gives the parameter variances
-parameter_variances = diag(cov_matrix);
-disp('Estimated Parameter Variances:');
-disp(parameter_variances);
+B_variance_theoretical = parameter_variances(B_indices);
+F_variance_theoretical = parameter_variances(F_indices);
 
-% ------------------------------ PART 6 --------------------------------- %
+% Combine for plotting
+all_variances_mc = [B_variance_mc, F_variance_mc];
+all_variances_theoretical = [B_variance_theoretical, F_variance_theoretical];
 
-clc; close all; clear;
+% Create bar plot
+figure;
+bar(1:(nb+nf), [all_variances_mc(:), all_variances_theoretical(:)]);
+xlabel('Parameter Index for B(q) & F(q)');
+ylabel('Variance');
+title('Monte Carlo vs. Theoretical Variance');
+legend('Monte Carlo Variance', 'Theoretical Variance');
+grid on;
 
-% Define the parameters
-N = 3000;               % Number of data points
-M = 1.8;                % Maximum value of input signal
-x = 0.69969;            % Bandwidth range
+%% ------------------------------ PART 6 -------------------------------- %
 
-Band = [0 x];           % Frequency range
-Range = [-M, M];        % Range of values for input signal
+% clc; close all; clear;
 
-% Generate a random reference signal for the closed-loop system
-r_prbs = idinput(N, 'prbs', Band, Range);
+% load closed loop data (this is a PRBS signal)
+data_closed_loop = load('data/data_closed_loop.mat');
+data_prbs_close = data_closed_loop.data;
 
-% Get closed-loop and open-loop data using the assignment_sys_33 function
-[u_prbs, y_prbs] = assignment_sys_33(r_prbs, 'closed loop');
-data_prbs_close = iddata(y_prbs, u_prbs); 
+% perform system identification for the closed-loop system
+% model orders are optimized by minimum AIC value
+model_ARMAX = armax(data_prbs_close, [5 5 30 1]);
 
-[u_prbs, y_prbs] = assignment_sys_33(r_prbs, 'open loop');
-data_prbs_open = iddata(y_prbs, u_prbs);
+disp(aic(model_ARMAX))
 
-% perform system identification for the closed-loop system using the OE model
-% model orders are optimized by AIC value
-
-model_OE_close = oe(data_prbs_close, [5 5 0]);
-model_OE_open = oe(data_prbs_open, [5 4 1]);
-
-% Compare the closed-loop and open-loop models against validation data
-r_prbs = idinput(N, 'prbs', Band, Range);
-[u_prbs, y_prbs] = assignment_sys_33(r_prbs, 'closed loop');
-data_prbs__close_val = iddata(y_prbs, u_prbs); 
-
-[u_prbs, y_prbs] = assignment_sys_33(r_prbs, 'open loop');
-data_prbs__open_val = iddata(y_prbs, u_prbs); 
+% load validation data for closed loop
+data_closed_loop_validation = load('data/data_closed_loop_validation.mat');
+val_data_closed = data_closed_loop_validation.val_data;
 
 
-subplot(2, 1, 1);
-compare(data_prbs__close_val, model_OE_open, model_OE_close);
-legend('Closed-Loop Data', 'Open-Loop Model', 'Closed-Loop Model');
+% Validation Test 1 : Pole 
+figure;
+pzmap(model_ARMAX);
+title('Pole-Zero Map of ARMAX Model');
+grid on;
 
-subplot(2, 1, 2);
-compare(data_prbs__open_val, model_OE_open, model_OE_close);
-legend('Open-Loop Data', 'Open-Loop Model', 'Closed-Loop Model');
+is_stable = isstable(model_ARMAX);
+disp(['Is the ARMAX model stable? ', mat2str(is_stable)]);
 
-% Display results of the closed-loop identification
-disp('Closed-Loop Model Parameters:');
-disp(model_OE_close);
+% Validation Test 2: Residual Analysis 
+figure;
+resid(val_data_closed, model_ARMAX);
+sgtitle('Residual Analysis of ARMAX Model');
+
+% estimate the Frequency Response Function (FRF)
+G_frf_closed = spa(data_prbs_close);
+
+figure;
+bode(G_frf_closed, model_ARMAX);
+legend('Nonparametric FRF (spa)', 'Parametric ARMAX Model');
+title('Comparison of Nonparametric FRF and ARMAX Model');
+grid on;
+
+figure;
+compare(val_data_closed, model_ARMAX);
+title('ARMAX Model Performance on New Validation Data');
+legend('Measured Output', 'Model Prediction');
+
+figure;
+compare(val_data_open, model_BJ);
+title('BJ Model Performance on New Validation Data');
+legend('Measured Output', 'Model Prediction');
